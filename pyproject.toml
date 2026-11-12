@@ -1,0 +1,21 @@
+[project]
+name = "backtest-dsl"
+version = "0.1.0"
+description = "A small ANTLR-oriented DSL for option backtests"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+antlr = [
+    "antlr4-python3-runtime==4.13.2",
+    "antlr4-tools==0.2.2",
+]
+quantlib = [
+    "QuantLib>=1.35",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

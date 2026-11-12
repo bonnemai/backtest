@@ -1,0 +1,20 @@
+strategy "vanilla_roll" {
+  initial_cash 50000 USD;
+  start 2025-01-02;
+  end 2025-06-30;
+  buy notional 1M USD vanilla(
+    underlying "EURUSD",
+    kind call,
+    strike atmf,
+    tenor 1M
+  );
+  every 3W {
+    sell position;
+    buy with cash vanilla(
+      underlying "EURUSD",
+      kind call,
+      strike atmf,
+      tenor 1M
+    );
+  }
+}
