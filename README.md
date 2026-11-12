@@ -1,39 +1,39 @@
-# Backtest DSL — première version
+# Backtest DSL — first version
 
-Cette première version décrit une stratégie de roll d'options dans un petit
-langage déclaratif. L'exemple [`examples/vanilla_roll.bt`](examples/vanilla_roll.bt)
-exprime :
+This first version describes an option roll strategy in a small declarative
+language. The example [`examples/vanilla_roll.bt`](examples/vanilla_roll.bt)
+expresses:
 
 ```text
-acheter 1M USD de notionnel ATMF, maturité 1M
-tous les 3W : vendre, puis réinvestir tout le cash dans une nouvelle option
+buy 1M USD of ATMF notional, with a 1M maturity
+every 3W: sell, then reinvest all cash in a new option
 ```
 
-Le projet utilise **ANTLR4** pour définir et générer le parseur de la DSL, et
-**QuantLib** pour le pricing des options et le calcul des sensibilités dans
-l'adaptateur de marché de test. Ces deux composants sont optionnels selon le
-besoin : ANTLR est installé avec `.[antlr]` et QuantLib avec `.[quantlib]`.
+The project uses **ANTLR4** to define and generate the DSL parser, and
+**QuantLib** for option pricing and sensitivity calculations in the test market
+adapter. Both components are optional: install ANTLR with `.[antlr]` and
+QuantLib with `.[quantlib]`.
 
-La grammaire de référence est [`grammar/Backtest.g4`](grammar/Backtest.g4).
-Elle est compatible avec ANTLR4. Le module [`parser.py`](src/backtest_dsl/parser.py)
-contient pour l'instant un parseur Python sans dépendance, afin que l'AST et le
-moteur soient utilisables avant la génération des fichiers ANTLR.
+The reference grammar is [`grammar/Backtest.g4`](grammar/Backtest.g4), and is
+compatible with ANTLR4. The [`parser.py`](src/backtest_dsl/parser.py) module
+currently contains a dependency-free Python parser, so the AST and engine can
+be used before generating the ANTLR files.
 
-## Générer le parseur ANTLR
+## Generate the ANTLR parser
 
-Il n'est pas nécessaire de télécharger manuellement le JAR. ANTLR fournit
-`antlr4-tools`, installable depuis Python. Cet outil crée la commande `antlr4`
-et télécharge le JAR au premier lancement ; il peut également installer un JRE
-si Java n'est pas présent. Le runtime Python reste séparé : il sert à exécuter
-les classes générées.
+There is no need to download the JAR manually. ANTLR provides `antlr4-tools`,
+which can be installed from Python. This tool creates the `antlr4` command and
+downloads the JAR on first use; it can also install a JRE if Java is not
+available. The Python runtime remains separate and is used to run the generated
+classes.
 
-Installation :
+Install it with:
 
 ```bash
 python -m pip install -e '.[antlr]'
 ```
 
-Génération :
+Generate the parser with:
 
 ```bash
 ANTLR4_TOOLS_ANTLR_VERSION=4.13.2 antlr4 \
@@ -43,10 +43,10 @@ ANTLR4_TOOLS_ANTLR_VERSION=4.13.2 antlr4 \
   grammar/Backtest.g4
 ```
 
-Le verrouillage de la version est volontaire : il évite que `antlr4-tools`
-essaie d'interroger automatiquement Sonatype pour trouver la dernière version.
-Cette détection peut échouer avec une réponse HTTP 400. La même variable peut
-être exportée pour la session :
+The version is pinned intentionally: this prevents `antlr4-tools` from
+automatically querying Sonatype for the latest version. That lookup can fail
+with an HTTP 400 response. The same variable can be exported for the current
+shell session:
 
 ```bash
 export ANTLR4_TOOLS_ANTLR_VERSION=4.13.2
@@ -54,18 +54,17 @@ antlr4 -Dlanguage=Python3 -visitor \
   -o src/backtest_dsl/generated grammar/Backtest.g4
 ```
 
-Le JAR et les fichiers téléchargés sont des dépendances/outils locaux ; ils ne
-doivent pas être commités. Les versions du générateur et de
-`antlr4-python3-runtime` doivent rester identiques, conformément à la
-documentation du target Python ANTLR.
+The JAR and downloaded files are local dependencies/tools and should not be
+committed. The generator and `antlr4-python3-runtime` versions must remain
+identical, as required by the ANTLR Python target documentation.
 
-L'étape suivante consistera à remplacer l'adaptateur de parsing par un
-`BacktestVisitor` généré, sans modifier le moteur de backtest.
+The next step is to replace the parsing adapter with a generated
+`BacktestVisitor`, without modifying the backtest engine.
 
-## Contrat de pricing
+## Pricing contract
 
-Le moteur reçoit une implémentation de `BacktestInput`, qui regroupe le prix
-de l'option et le calcul du strike ATMF :
+The engine receives a `BacktestInput` implementation that provides option
+prices and ATMF strike calculations:
 
 ```python
 from backtest_dsl import BacktestEngine, BacktestInput
@@ -90,27 +89,26 @@ class MyInput(BacktestInput):
 engine = BacktestEngine(MyInput())
 ```
 
-`premium` est supposée être une fraction du notionnel. Une prime de `0.025`
-sur un notionnel de `1_000_000` vaut donc `25_000` USD.
+`premium` is assumed to be a fraction of notional. A premium of `0.025` on a
+notional of `1_000_000` is therefore worth `25_000` USD.
 
-Le résultat du moteur contient également `pnl`, `delta_pnl`, `gamma_pnl`,
-`vega_pnl`, `theta_pnl` et `residual_pnl`. L'approximation utilisée entre deux
-dates est :
+The engine output also contains `pnl`, `delta_pnl`, `gamma_pnl`, `vega_pnl`,
+`theta_pnl`, and `residual_pnl`. The approximation used between two dates is:
 
 ```text
 delta P&L = N × delta × Δforward
 gamma P&L = 0.5 × N × gamma × Δforward²
 vega P&L  = N × vega × Δvol
 theta P&L = N × theta × Δt
-résiduel  = P&L observé - somme des contributions
+residual  = observed P&L - sum of contributions
 ```
 
-`theta` est supposé exprimé par année et `vega` par unité de volatilité
-absolue. Si `forward` n'est pas fourni, le moteur essaie d'utiliser `spot`.
+`theta` is assumed to be expressed per year and `vega` per unit of absolute
+volatility. If `forward` is not provided, the engine tries to use `spot`.
 
-## Période du backtest
+## Backtest period
 
-Les dates font partie des inputs de la stratégie :
+Dates are part of the strategy inputs:
 
 ```text
 initial_cash 50000 USD;
@@ -118,24 +116,23 @@ start 2025-01-02;
 end 2025-06-30;
 ```
 
-Le moteur peut alors générer automatiquement les jours du lundi au vendredi :
+The engine can automatically generate weekdays from Monday to Friday:
 
 ```python
 snapshots = await engine.run(strategy)
 ```
 
-Pour gérer précisément les jours fériés, un calendrier externe peut toujours
-être fourni :
+To handle holidays precisely, an external calendar can be provided:
 
 ```python
 snapshots = await engine.run(strategy, dates=market_calendar)
 ```
 
-### Premier test avec QuantLib
+### First QuantLib test
 
-QuantLib est disponible comme dépendance optionnelle. `QuantLibInput` utilise
-un modèle Black-Scholes avec spot 1.0, taux nuls et volatilité constante de
-20 % par défaut :
+QuantLib is available as an optional dependency. `QuantLibInput` uses a
+Black-Scholes model with spot 1.0, zero rates, and constant volatility of 20%
+by default:
 
 ```bash
 python -m pip install -e '.[quantlib]'
@@ -147,3 +144,4 @@ from backtest_dsl import BacktestEngine, QuantLibInput
 engine = BacktestEngine(QuantLibInput(volatility=0.20))
 snapshots = await engine.run(strategy)
 ```
+
